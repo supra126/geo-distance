@@ -122,18 +122,20 @@ import pkg from '../../../../package.json';
       return { lat: round(lat, digits), lng: round(lng, digits) };
     }
 
+    function normalizeLng(lng) { return ((lng % 360) + 540) % 360 - 180; }
+
     function geoDestination(origin, distance, brng, unit = 'km', digits = 6) {
       const r = UNIT_RADIUS[unit], ang = distance / r, br = deg2rad(brng);
       const latR = deg2rad(origin.lat), lngR = deg2rad(origin.lng);
       const dLat = Math.asin(Math.sin(latR) * Math.cos(ang) + Math.cos(latR) * Math.sin(ang) * Math.cos(br));
       const dLng = lngR + Math.atan2(Math.sin(br) * Math.sin(ang) * Math.cos(latR), Math.cos(ang) - Math.sin(latR) * Math.sin(dLat));
-      return { lat: round(rad2deg(dLat), digits), lng: round(rad2deg(dLng), digits) };
+      return { lat: round(rad2deg(dLat), digits), lng: round(normalizeLng(rad2deg(dLng)), digits) };
     }
 
     function geoBoundingBox(center, radius, unit = 'km', digits = 6) {
       const r = UNIT_RADIUS[unit];
       const latD = rad2deg(radius / r);
-      const lngD = rad2deg(radius / (r * Math.cos(deg2rad(center.lat))));
+      const lngD = Math.min(180, rad2deg(radius / (r * Math.cos(deg2rad(center.lat)))));
       return {
         minLat: round(center.lat - latD, digits), maxLat: round(center.lat + latD, digits),
         minLng: round(center.lng - lngD, digits), maxLng: round(center.lng + lngD, digits),

@@ -18,7 +18,7 @@ const npmUrl = `https://www.npmjs.com/package/${pkg.name}`;
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="description" content={description} />
   <title>{title}</title>
-  <link rel="icon" type="image/svg+xml" href={`${base}favicon.svg`} />
+  <link rel="icon" type="image/svg+xml" href={`${base}/favicon.svg`} />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
@@ -61,8 +61,8 @@ const npmUrl = `https://www.npmjs.com/package/${pkg.name}`;
     <div class="nav-inner">
       <a href={base} class="nav-logo">{pkg.name}</a>
       <div class="nav-links">
-        <a href={`${base}#api`}>API</a>
-        <a href={`${base}playground/`}>Playground</a>
+        <a href={`${base}/#api`}>API</a>
+        <a href={`${base}/playground/`}>Playground</a>
         <a href={repoUrl} target="_blank" rel="noopener">GitHub</a>
         <a href={npmUrl} target="_blank" rel="noopener">npm</a>
       </div>
