@@ -4,7 +4,8 @@
 *.log
 *.tgz
 coverage
-dist
+/dist
+docs/dist
 lib-cov
 logs
 node_modules
