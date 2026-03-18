@@ -48,6 +48,10 @@ function round(value: number, digits: number): number {
   return Math.round(value * factor) / factor
 }
 
+function normalizeLng(lng: number): number {
+  return (((lng % 360) + 540) % 360) - 180
+}
+
 /**
  * Calculate distance between two coordinates using the Haversine formula
  * @param a Coordinate A
@@ -128,7 +132,7 @@ export function destination(origin: Coord, distance: number, brng: number, unit:
       Math.sin(brngRad) * Math.sin(angularDist) * Math.cos(latRad),
       Math.cos(angularDist) - Math.sin(latRad) * Math.sin(destLat),
     )
-  return { lat: round(rad2deg(destLat), digits), lng: round(rad2deg(destLng), digits) }
+  return { lat: round(rad2deg(destLat), digits), lng: round(normalizeLng(rad2deg(destLng)), digits) }
 }
 
 /**
@@ -143,7 +147,7 @@ export function destination(origin: Coord, distance: number, brng: number, unit:
 export function boundingBox(center: Coord, radius: number, unit: Unit = 'km', digits = 6): BoundingBox {
   const r = Unit[unit]
   const latDelta = rad2deg(radius / r)
-  const lngDelta = rad2deg(radius / (r * Math.cos(deg2rad(center.lat))))
+  const lngDelta = Math.min(180, rad2deg(radius / (r * Math.cos(deg2rad(center.lat)))))
   return {
     minLat: round(center.lat - latDelta, digits),
     maxLat: round(center.lat + latDelta, digits),
@@ -174,6 +178,7 @@ export function isWithin(a: Coord, b: Coord, radius: number, unit: Unit = 'km'):
  * @example nearest({ lat: 25.08, lng: 121.39 }, [{ lat: 24.18, lng: 120.55 }, { lat: 21.95, lng: 120.77 }])
  */
 export function nearest(target: Coord, coords: Coord[], unit: Unit = 'km'): Coord {
+  if (coords.length === 0) throw new RangeError('coords must not be empty')
   let minDist = Infinity
   let result = coords[0]
   for (const coord of coords) {

@@ -19,14 +19,12 @@ const kenting = { name: 'Kenting', lat: 21.9578574, lng: 120.7790883 }
 describe('between', () => {
   it('calculates distance in km by default', () => {
     const result = between(taipei, kenting)
-    expect(result).toBeTypeOf('number')
-    expect(result).toBeGreaterThan(0)
+    expect(result).toBeCloseTo(353.81, 0)
   })
 
   it('calculates distance in ft', () => {
     const result = between(taipei, kenting, 'ft', 2)
-    expect(result).toBeTypeOf('number')
-    expect(result).toBeGreaterThan(0)
+    expect(result).toBeCloseTo(1159482, -2)
   })
 
   it('returns 0 for same coordinates', () => {
@@ -84,6 +82,12 @@ describe('destination', () => {
     const dest = destination(taipei, 50, 0)
     expect(dest.lat).toBeGreaterThan(taipei.lat)
   })
+
+  it('normalizes longitude when crossing antimeridian', () => {
+    const dest = destination({ lat: 0, lng: 170 }, 5000, 90)
+    expect(dest.lng).toBeGreaterThanOrEqual(-180)
+    expect(dest.lng).toBeLessThanOrEqual(180)
+  })
 })
 
 describe('boundingBox', () => {
@@ -100,6 +104,12 @@ describe('boundingBox', () => {
     const latBelow = taipei.lat - box.minLat
     const latAbove = box.maxLat - taipei.lat
     expect(latBelow).toBeCloseTo(latAbove, 6)
+  })
+
+  it('clamps longitude delta near poles', () => {
+    const box = boundingBox({ lat: 89.9, lng: 0 }, 100)
+    expect(box.minLng).toBeGreaterThanOrEqual(-180)
+    expect(box.maxLng).toBeLessThanOrEqual(180)
   })
 
   it('contains coordinates within the radius', () => {
@@ -135,6 +145,10 @@ describe('nearest', () => {
   it('returns the only coordinate when array has one element', () => {
     const result = nearest(taipei, [kenting])
     expect(result.name).toBe('Kenting')
+  })
+
+  it('throws on empty array', () => {
+    expect(() => nearest(taipei, [])).toThrow(RangeError)
   })
 })
 
