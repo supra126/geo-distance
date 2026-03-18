@@ -1,0 +1,426 @@
+---
+import Base from '../../layouts/Base.astro';
+import pkg from '../../../../package.json';
+---
+<Base title={`Playground - ${pkg.name}`}>
+  <main class="pg">
+    <div class="pg-sidebar">
+      <h2>Playground</h2>
+      <p class="pg-hint">Click on the map to set points, or enter coordinates manually.</p>
+
+      <!-- Function selector -->
+      <div class="field">
+        <label>Function</label>
+        <select id="fn-select">
+          <option value="between">between</option>
+          <option value="bearing">bearing</option>
+          <option value="midpoint">midpoint</option>
+          <option value="destination">destination</option>
+          <option value="boundingBox">boundingBox</option>
+          <option value="isWithin">isWithin</option>
+        </select>
+      </div>
+
+      <!-- Point A -->
+      <fieldset class="coord-group" id="group-a">
+        <legend>Point A</legend>
+        <div class="coord-row">
+          <div class="field">
+            <label>Lat</label>
+            <input type="number" id="a-lat" step="any" value="25.0853" />
+          </div>
+          <div class="field">
+            <label>Lng</label>
+            <input type="number" id="a-lng" step="any" value="121.3967" />
+          </div>
+        </div>
+      </fieldset>
+
+      <!-- Point B -->
+      <fieldset class="coord-group" id="group-b">
+        <legend>Point B</legend>
+        <div class="coord-row">
+          <div class="field">
+            <label>Lat</label>
+            <input type="number" id="b-lat" step="any" value="21.9579" />
+          </div>
+          <div class="field">
+            <label>Lng</label>
+            <input type="number" id="b-lng" step="any" value="120.7791" />
+          </div>
+        </div>
+      </fieldset>
+
+      <!-- Extra params -->
+      <div class="extra-params" id="extra-params">
+        <div class="field" id="field-unit">
+          <label>Unit</label>
+          <select id="param-unit">
+            <option value="km">km</option>
+            <option value="m">m</option>
+            <option value="ft">ft</option>
+          </select>
+        </div>
+        <div class="field hidden" id="field-distance">
+          <label>Distance (km)</label>
+          <input type="number" id="param-distance" step="any" value="100" />
+        </div>
+        <div class="field hidden" id="field-bearing">
+          <label>Bearing (degrees)</label>
+          <input type="number" id="param-bearing" step="any" value="180" min="0" max="360" />
+        </div>
+        <div class="field hidden" id="field-radius">
+          <label>Radius (km)</label>
+          <input type="number" id="param-radius" step="any" value="50" />
+        </div>
+      </div>
+
+      <button id="btn-calc" class="btn-calc">Calculate</button>
+
+      <!-- Result -->
+      <div class="result-box" id="result-box">
+        <div class="result-label">Result</div>
+        <pre id="result-value">Click "Calculate" to see the result</pre>
+      </div>
+    </div>
+
+    <div class="pg-map" id="map"></div>
+  </main>
+
+  <!-- Leaflet CSS/JS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script is:inline src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <script is:inline>
+    // ── Geo functions (inline to avoid bundling issues) ──
+    const UNIT_RADIUS = { km: 6378.137, m: 6378137, ft: 20902231.52 };
+
+    function deg2rad(d) { return d * (Math.PI / 180); }
+    function rad2deg(r) { return r * (180 / Math.PI); }
+    function round(v, d) { const f = 10 ** d; return Math.round(v * f) / f; }
+
+    function geoBetween(a, b, unit = 'km', digits = 4) {
+      const dLat = deg2rad(b.lat - a.lat);
+      const dLon = deg2rad(b.lng - a.lng);
+      const x = Math.sin(dLat / 2) ** 2 + Math.cos(deg2rad(a.lat)) * Math.cos(deg2rad(b.lat)) * Math.sin(dLon / 2) ** 2;
+      const y = 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
+      return round(y * UNIT_RADIUS[unit], digits);
+    }
+
+    function geoBearing(a, b, digits = 4) {
+      const aR = deg2rad(a.lat), bR = deg2rad(b.lat), dL = deg2rad(b.lng - a.lng);
+      const x = Math.sin(dL) * Math.cos(bR);
+      const y = Math.cos(aR) * Math.sin(bR) - Math.sin(aR) * Math.cos(bR) * Math.cos(dL);
+      return round(((rad2deg(Math.atan2(x, y)) % 360) + 360) % 360, digits);
+    }
+
+    function geoMidpoint(a, b, digits = 6) {
+      const aR = deg2rad(a.lat), bR = deg2rad(b.lat), dL = deg2rad(b.lng - a.lng);
+      const bx = Math.cos(bR) * Math.cos(dL), by = Math.cos(bR) * Math.sin(dL);
+      const lat = rad2deg(Math.atan2(Math.sin(aR) + Math.sin(bR), Math.sqrt((Math.cos(aR) + bx) ** 2 + by ** 2)));
+      const lng = rad2deg(deg2rad(a.lng) + Math.atan2(by, Math.cos(aR) + bx));
+      return { lat: round(lat, digits), lng: round(lng, digits) };
+    }
+
+    function geoDestination(origin, distance, brng, unit = 'km', digits = 6) {
+      const r = UNIT_RADIUS[unit], ang = distance / r, br = deg2rad(brng);
+      const latR = deg2rad(origin.lat), lngR = deg2rad(origin.lng);
+      const dLat = Math.asin(Math.sin(latR) * Math.cos(ang) + Math.cos(latR) * Math.sin(ang) * Math.cos(br));
+      const dLng = lngR + Math.atan2(Math.sin(br) * Math.sin(ang) * Math.cos(latR), Math.cos(ang) - Math.sin(latR) * Math.sin(dLat));
+      return { lat: round(rad2deg(dLat), digits), lng: round(rad2deg(dLng), digits) };
+    }
+
+    function geoBoundingBox(center, radius, unit = 'km', digits = 6) {
+      const r = UNIT_RADIUS[unit];
+      const latD = rad2deg(radius / r);
+      const lngD = rad2deg(radius / (r * Math.cos(deg2rad(center.lat))));
+      return {
+        minLat: round(center.lat - latD, digits), maxLat: round(center.lat + latD, digits),
+        minLng: round(center.lng - lngD, digits), maxLng: round(center.lng + lngD, digits),
+      };
+    }
+
+    function geoIsWithin(a, b, radius, unit = 'km') {
+      return geoBetween(a, b, unit) <= radius;
+    }
+
+    // ── DOM refs ──
+    const $ = (s) => document.querySelector(s);
+    const fnSelect = $('#fn-select');
+    const aLat = $('#a-lat'), aLng = $('#a-lng');
+    const bLat = $('#b-lat'), bLng = $('#b-lng');
+    const groupB = $('#group-b');
+    const fieldUnit = $('#field-unit');
+    const fieldDist = $('#field-distance');
+    const fieldBear = $('#field-bearing');
+    const fieldRadius = $('#field-radius');
+    const paramUnit = $('#param-unit');
+    const paramDist = $('#param-distance');
+    const paramBear = $('#param-bearing');
+    const paramRadius = $('#param-radius');
+    const btnCalc = $('#btn-calc');
+    const resultValue = $('#result-value');
+
+    // ── Map setup ──
+    const map = L.map('map').setView([23.5, 121], 7);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors',
+      maxZoom: 19,
+    }).addTo(map);
+
+    let markerA = L.marker([25.0853, 121.3967], { draggable: true }).addTo(map).bindPopup('A');
+    let markerB = L.marker([21.9579, 120.7791], { draggable: true }).addTo(map).bindPopup('B');
+    let resultLayer = L.layerGroup().addTo(map);
+
+    let clickTarget = 'a'; // alternates
+
+    markerA.on('dragend', () => {
+      const p = markerA.getLatLng();
+      aLat.value = round(p.lat, 4);
+      aLng.value = round(p.lng, 4);
+    });
+    markerB.on('dragend', () => {
+      const p = markerB.getLatLng();
+      bLat.value = round(p.lat, 4);
+      bLng.value = round(p.lng, 4);
+    });
+
+    map.on('click', (e) => {
+      const { lat, lng } = e.latlng;
+      if (clickTarget === 'a') {
+        aLat.value = round(lat, 4);
+        aLng.value = round(lng, 4);
+        markerA.setLatLng([lat, lng]);
+        clickTarget = 'b';
+      } else {
+        bLat.value = round(lat, 4);
+        bLng.value = round(lng, 4);
+        markerB.setLatLng([lat, lng]);
+        clickTarget = 'a';
+      }
+    });
+
+    // ── UI toggle ──
+    function updateUI() {
+      const fn = fnSelect.value;
+      const needsB = ['between', 'bearing', 'midpoint', 'isWithin'].includes(fn);
+      groupB.style.display = needsB ? '' : 'none';
+      markerB.setOpacity(needsB ? 1 : 0);
+
+      fieldDist.classList.toggle('hidden', fn !== 'destination');
+      fieldBear.classList.toggle('hidden', fn !== 'destination');
+      fieldRadius.classList.toggle('hidden', !['boundingBox', 'isWithin'].includes(fn));
+      fieldUnit.classList.toggle('hidden', fn === 'bearing' || fn === 'midpoint');
+    }
+    fnSelect.addEventListener('change', updateUI);
+    updateUI();
+
+    // ── Sync inputs → markers ──
+    function syncMarkers() {
+      markerA.setLatLng([parseFloat(aLat.value) || 0, parseFloat(aLng.value) || 0]);
+      markerB.setLatLng([parseFloat(bLat.value) || 0, parseFloat(bLng.value) || 0]);
+    }
+    [aLat, aLng, bLat, bLng].forEach(el => el.addEventListener('input', syncMarkers));
+
+    // ── Calculate ──
+    function calculate() {
+      resultLayer.clearLayers();
+      const a = { lat: parseFloat(aLat.value), lng: parseFloat(aLng.value) };
+      const b = { lat: parseFloat(bLat.value), lng: parseFloat(bLng.value) };
+      const unit = paramUnit.value;
+      const fn = fnSelect.value;
+      let result;
+
+      try {
+        switch (fn) {
+          case 'between': {
+            result = geoBetween(a, b, unit);
+            L.polyline([[a.lat, a.lng], [b.lat, b.lng]], { color: '#38bdf8', weight: 3 }).addTo(resultLayer);
+            resultValue.textContent = `${result} ${unit}`;
+            break;
+          }
+          case 'bearing': {
+            result = geoBearing(a, b);
+            L.polyline([[a.lat, a.lng], [b.lat, b.lng]], { color: '#a78bfa', weight: 3, dashArray: '8 4' }).addTo(resultLayer);
+            resultValue.textContent = `${result}\u00B0`;
+            break;
+          }
+          case 'midpoint': {
+            result = geoMidpoint(a, b);
+            L.polyline([[a.lat, a.lng], [b.lat, b.lng]], { color: '#38bdf8', weight: 2, opacity: 0.5 }).addTo(resultLayer);
+            L.circleMarker([result.lat, result.lng], { radius: 8, color: '#4ade80', fillColor: '#4ade80', fillOpacity: 0.8 })
+              .addTo(resultLayer).bindPopup('Midpoint').openPopup();
+            resultValue.textContent = JSON.stringify(result, null, 2);
+            break;
+          }
+          case 'destination': {
+            const dist = parseFloat(paramDist.value);
+            const bear = parseFloat(paramBear.value);
+            result = geoDestination(a, dist, bear, unit);
+            L.polyline([[a.lat, a.lng], [result.lat, result.lng]], { color: '#fb923c', weight: 3 }).addTo(resultLayer);
+            L.circleMarker([result.lat, result.lng], { radius: 8, color: '#fb923c', fillColor: '#fb923c', fillOpacity: 0.8 })
+              .addTo(resultLayer).bindPopup('Destination').openPopup();
+            resultValue.textContent = JSON.stringify(result, null, 2);
+            break;
+          }
+          case 'boundingBox': {
+            const rad = parseFloat(paramRadius.value);
+            result = geoBoundingBox(a, rad, unit);
+            L.rectangle([[result.minLat, result.minLng], [result.maxLat, result.maxLng]], {
+              color: '#a78bfa', weight: 2, fillOpacity: 0.1,
+            }).addTo(resultLayer);
+            resultValue.textContent = JSON.stringify(result, null, 2);
+            break;
+          }
+          case 'isWithin': {
+            const rad = parseFloat(paramRadius.value);
+            result = geoIsWithin(a, b, rad, unit);
+            const dist = geoBetween(a, b, unit);
+            L.polyline([[a.lat, a.lng], [b.lat, b.lng]], {
+              color: result ? '#4ade80' : '#f87171', weight: 3,
+            }).addTo(resultLayer);
+            L.circle([a.lat, a.lng], {
+              radius: rad * (unit === 'km' ? 1000 : unit === 'm' ? 1 : 0.3048),
+              color: result ? '#4ade80' : '#f87171', weight: 1, fillOpacity: 0.08,
+            }).addTo(resultLayer);
+            resultValue.textContent = `${result} (distance: ${dist} ${unit}, radius: ${rad} ${unit})`;
+            break;
+          }
+        }
+      } catch (e) {
+        resultValue.textContent = 'Error: ' + e.message;
+      }
+    }
+
+    btnCalc.addEventListener('click', calculate);
+    // auto-calculate on load
+    calculate();
+  </script>
+
+  <style>
+    .pg {
+      display: flex;
+      height: calc(100vh - 53px - 65px);
+      min-height: 500px;
+    }
+    .pg-sidebar {
+      width: 360px;
+      min-width: 320px;
+      padding: 1.25rem;
+      overflow-y: auto;
+      border-right: 1px solid var(--c-border);
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+    .pg-sidebar h2 {
+      font-size: 1.25rem;
+      margin: 0;
+    }
+    .pg-hint {
+      font-size: 0.8rem;
+      color: var(--c-text-muted);
+      margin: 0;
+    }
+    .pg-map {
+      flex: 1;
+      min-width: 0;
+    }
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+    .field label {
+      font-size: 0.75rem;
+      color: var(--c-text-muted);
+      font-weight: 500;
+    }
+    .field input, .field select {
+      background: var(--c-bg);
+      border: 1px solid var(--c-border);
+      border-radius: 6px;
+      padding: 0.45rem 0.6rem;
+      color: var(--c-text);
+      font-size: 0.85rem;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .field input:focus, .field select:focus {
+      outline: none;
+      border-color: var(--c-primary);
+    }
+    .coord-group {
+      border: 1px solid var(--c-border);
+      border-radius: 8px;
+      padding: 0.75rem;
+    }
+    .coord-group legend {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--c-primary);
+      padding: 0 0.35rem;
+    }
+    .coord-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.5rem;
+    }
+    .extra-params {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    .hidden { display: none !important; }
+    .btn-calc {
+      background: var(--c-primary);
+      color: var(--c-bg);
+      border: none;
+      border-radius: 8px;
+      padding: 0.6rem;
+      font-weight: 600;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .btn-calc:hover { background: var(--c-primary-soft); }
+    .result-box {
+      background: var(--c-bg);
+      border: 1px solid var(--c-border);
+      border-radius: 8px;
+      padding: 0.75rem;
+      flex: 1;
+      min-height: 60px;
+    }
+    .result-label {
+      font-size: 0.7rem;
+      color: var(--c-text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.35rem;
+    }
+    .result-box pre {
+      font-size: 0.85rem;
+      color: var(--c-green);
+      white-space: pre-wrap;
+      word-break: break-all;
+      margin: 0;
+    }
+
+    @media (max-width: 768px) {
+      .pg {
+        flex-direction: column;
+        height: auto;
+      }
+      .pg-sidebar {
+        width: 100%;
+        min-width: 0;
+        border-right: none;
+        border-bottom: 1px solid var(--c-border);
+      }
+      .pg-map {
+        height: 50vh;
+        min-height: 300px;
+      }
+    }
+  </style>
+</Base>

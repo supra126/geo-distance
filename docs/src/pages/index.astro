@@ -1,0 +1,471 @@
+---
+import Base from '../layouts/Base.astro';
+import pkg from '../../../package.json';
+const base = import.meta.env.BASE_URL;
+
+const apis = [
+  {
+    name: 'between',
+    sig: 'between(a, b, unit?, digits?)',
+    desc: 'Calculate distance between two coordinates using the Haversine formula.',
+    params: [
+      ['a', 'Coord', 'First coordinate'],
+      ['b', 'Coord', 'Second coordinate'],
+      ['unit', "'km' | 'm' | 'ft'", "Unit of measurement (default: 'km')"],
+      ['digits', 'number', 'Decimal places (default: 4)'],
+    ],
+    returns: 'number',
+    example: `between(
+  { lat: 25.085, lng: 121.397 },
+  { lat: 21.958, lng: 120.779 }
+)
+// => 348.5263`,
+  },
+  {
+    name: 'bearing',
+    sig: 'bearing(a, b, digits?)',
+    desc: 'Calculate the initial bearing (forward azimuth) from A to B.',
+    params: [
+      ['a', 'Coord', 'Origin coordinate'],
+      ['b', 'Coord', 'Destination coordinate'],
+      ['digits', 'number', 'Decimal places (default: 4)'],
+    ],
+    returns: 'number (0-360)',
+    example: `bearing(
+  { lat: 25.08, lng: 121.39 },
+  { lat: 21.95, lng: 120.77 }
+)
+// => 190.6121`,
+  },
+  {
+    name: 'midpoint',
+    sig: 'midpoint(a, b, digits?)',
+    desc: 'Calculate the geographic midpoint between two coordinates.',
+    params: [
+      ['a', 'Coord', 'First coordinate'],
+      ['b', 'Coord', 'Second coordinate'],
+      ['digits', 'number', 'Decimal places (default: 6)'],
+    ],
+    returns: 'Coord',
+    example: `midpoint(
+  { lat: 25.08, lng: 121.39 },
+  { lat: 21.95, lng: 120.77 }
+)
+// => { lat: 23.518, lng: 121.075 }`,
+  },
+  {
+    name: 'destination',
+    sig: 'destination(origin, distance, bearing, unit?, digits?)',
+    desc: 'Calculate the destination given a start point, distance, and bearing.',
+    params: [
+      ['origin', 'Coord', 'Starting coordinate'],
+      ['distance', 'number', 'Distance to travel'],
+      ['bearing', 'number', 'Bearing in degrees (0-360)'],
+      ['unit', "'km' | 'm' | 'ft'", "Unit (default: 'km')"],
+      ['digits', 'number', 'Decimal places (default: 6)'],
+    ],
+    returns: 'Coord',
+    example: `destination(
+  { lat: 25.08, lng: 121.39 },
+  100, 180
+)
+// => { lat: 24.173, lng: 121.39 }`,
+  },
+  {
+    name: 'boundingBox',
+    sig: 'boundingBox(center, radius, unit?, digits?)',
+    desc: 'Calculate a bounding box around a center with a given radius.',
+    params: [
+      ['center', 'Coord', 'Center coordinate'],
+      ['radius', 'number', 'Radius distance'],
+      ['unit', "'km' | 'm' | 'ft'", "Unit (default: 'km')"],
+      ['digits', 'number', 'Decimal places (default: 6)'],
+    ],
+    returns: 'BoundingBox',
+    example: `boundingBox(
+  { lat: 25.08, lng: 121.39 },
+  10
+)
+// => { minLat: 24.99, maxLat: 25.17, ... }`,
+  },
+  {
+    name: 'isWithin',
+    sig: 'isWithin(a, b, radius, unit?)',
+    desc: 'Check if two coordinates are within a given distance.',
+    params: [
+      ['a', 'Coord', 'First coordinate'],
+      ['b', 'Coord', 'Second coordinate'],
+      ['radius', 'number', 'Maximum distance'],
+      ['unit', "'km' | 'm' | 'ft'", "Unit (default: 'km')"],
+    ],
+    returns: 'boolean',
+    example: `isWithin(
+  { lat: 25.08, lng: 121.39 },
+  { lat: 25.04, lng: 121.56 },
+  20
+)
+// => true`,
+  },
+  {
+    name: 'nearest',
+    sig: 'nearest(target, coords, unit?)',
+    desc: 'Find the nearest coordinate to the target from an array.',
+    params: [
+      ['target', 'Coord', 'Target coordinate'],
+      ['coords', 'Coord[]', 'Array of candidates'],
+      ['unit', "'km' | 'm' | 'ft'", "Unit (default: 'km')"],
+    ],
+    returns: 'Coord',
+    example: `nearest(
+  { lat: 23.15, lng: 120.17 },
+  [taipei, taichung, kenting]
+)
+// => taichung`,
+  },
+  {
+    name: 'filterWithin',
+    sig: 'filterWithin(target, coords, radius, unit?)',
+    desc: 'Filter coordinates within a given radius from the target.',
+    params: [
+      ['target', 'Coord', 'Target coordinate'],
+      ['coords', 'Coord[]', 'Array of coordinates'],
+      ['radius', 'number', 'Maximum distance'],
+      ['unit', "'km' | 'm' | 'ft'", "Unit (default: 'km')"],
+    ],
+    returns: 'Coord[]',
+    example: `filterWithin(
+  { lat: 23.15, lng: 120.17 },
+  coords, 150
+)
+// => [taichung, kenting]`,
+  },
+  {
+    name: 'nearSort',
+    sig: 'nearSort(target, coords, unit?)',
+    desc: 'Sort coordinates by distance from the target, nearest first.',
+    params: [
+      ['target', 'Coord', 'Target coordinate'],
+      ['coords', 'Coord[]', 'Array of coordinates'],
+      ['unit', "'km' | 'm' | 'ft'", "Unit (default: 'km')"],
+    ],
+    returns: 'Coord[]',
+    example: `nearSort(
+  { lat: 23.15, lng: 120.17 },
+  [taipei, taichung, kenting]
+)
+// => [taichung, kenting, taipei]`,
+  },
+];
+---
+<Base title={`${pkg.name} - Geo Distance Calculation`}>
+  <main>
+    <!-- Hero -->
+    <section class="hero">
+      <div class="hero-inner">
+        <div class="badge">v{pkg.version}</div>
+        <h1>{pkg.name}</h1>
+        <p class="hero-desc">Lightweight, zero-dependency library for geographic distance calculations.<br/>Haversine formula, bearing, midpoint, bounding box, and more.</p>
+        <div class="hero-actions">
+          <a href={`${base}playground/`} class="btn btn-primary">Interactive Playground</a>
+          <a href="#api" class="btn btn-outline">API Reference</a>
+        </div>
+        <div class="install-box">
+          <code>npm install {pkg.name}</code>
+        </div>
+      </div>
+    </section>
+
+    <!-- Features -->
+    <section class="features">
+      <div class="features-grid">
+        <div class="feature-card">
+          <h3>Distance</h3>
+          <p>Haversine formula for accurate great-circle distance</p>
+        </div>
+        <div class="feature-card">
+          <h3>Bearing</h3>
+          <p>Initial bearing / forward azimuth between points</p>
+        </div>
+        <div class="feature-card">
+          <h3>Midpoint</h3>
+          <p>Geographic midpoint along the great circle</p>
+        </div>
+        <div class="feature-card">
+          <h3>Bounding Box</h3>
+          <p>Rectangular bounds around a center + radius</p>
+        </div>
+        <div class="feature-card">
+          <h3>Nearest / Filter</h3>
+          <p>Find closest points or filter by radius</p>
+        </div>
+        <div class="feature-card">
+          <h3>Zero Dependencies</h3>
+          <p>Tiny bundle, tree-shakeable ESM + CJS</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Quick Start -->
+    <section class="section" id="quickstart">
+      <div class="container">
+        <h2>Quick Start</h2>
+        <pre class="code-block"><code>{`import { between, bearing, midpoint } from '${pkg.name}'
+
+const taipei = { lat: 25.085, lng: 121.397 }
+const kenting = { lat: 21.958, lng: 120.779 }
+
+between(taipei, kenting)          // 348.5263 km
+bearing(taipei, kenting)          // 190.6121 degrees
+midpoint(taipei, kenting)         // { lat: 23.518, lng: 121.075 }`}</code></pre>
+      </div>
+    </section>
+
+    <!-- Types -->
+    <section class="section">
+      <div class="container">
+        <h2>Types</h2>
+        <div class="type-cards">
+          <div class="type-card">
+            <h3>Coord</h3>
+            <pre><code>{`interface Coord {
+  name?: string
+  lat: number
+  lng: number
+}`}</code></pre>
+          </div>
+          <div class="type-card">
+            <h3>BoundingBox</h3>
+            <pre><code>{`interface BoundingBox {
+  minLat: number
+  maxLat: number
+  minLng: number
+  maxLng: number
+}`}</code></pre>
+          </div>
+          <div class="type-card">
+            <h3>Unit</h3>
+            <pre><code>{`type Unit = 'km' | 'm' | 'ft'
+
+// Earth's radius:
+// km: 6378.137
+// m:  6378137
+// ft: 20902231.52`}</code></pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- API Reference -->
+    <section class="section" id="api">
+      <div class="container">
+        <h2>API Reference</h2>
+        {apis.map(api => (
+          <div class="api-card" id={api.name}>
+            <div class="api-header">
+              <h3><code>{api.sig}</code></h3>
+              <span class="api-returns">returns <code>{api.returns}</code></span>
+            </div>
+            <p class="api-desc">{api.desc}</p>
+            <table class="api-table">
+              <thead>
+                <tr><th>Param</th><th>Type</th><th>Description</th></tr>
+              </thead>
+              <tbody>
+                {api.params.map(([name, type, desc]) => (
+                  <tr><td><code>{name}</code></td><td><code>{type}</code></td><td>{desc}</td></tr>
+                ))}
+              </tbody>
+            </table>
+            <pre class="code-block code-sm"><code>{api.example}</code></pre>
+          </div>
+        ))}
+      </div>
+    </section>
+  </main>
+
+  <style>
+    .hero {
+      text-align: center;
+      padding: 5rem 1.5rem 4rem;
+      background: linear-gradient(180deg, rgba(56, 189, 248, 0.08) 0%, transparent 80%);
+    }
+    .hero-inner { max-width: 700px; margin: 0 auto; }
+    .badge {
+      display: inline-block;
+      padding: 0.25rem 0.75rem;
+      background: var(--c-bg-soft);
+      border: 1px solid var(--c-border);
+      border-radius: 99px;
+      font-size: 0.8rem;
+      color: var(--c-primary);
+      margin-bottom: 1rem;
+    }
+    .hero h1 {
+      font-size: 2.5rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--c-primary), var(--c-accent));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 1rem;
+    }
+    .hero-desc {
+      font-size: 1.1rem;
+      color: var(--c-text-muted);
+      margin-bottom: 2rem;
+    }
+    .hero-actions {
+      display: flex;
+      gap: 1rem;
+      justify-content: center;
+      margin-bottom: 2rem;
+    }
+    .btn {
+      display: inline-block;
+      padding: 0.65rem 1.5rem;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 0.95rem;
+      transition: all 0.2s;
+    }
+    .btn:hover { text-decoration: none; }
+    .btn-primary {
+      background: var(--c-primary);
+      color: var(--c-bg);
+    }
+    .btn-primary:hover { background: var(--c-primary-soft); }
+    .btn-outline {
+      border: 1px solid var(--c-border);
+      color: var(--c-text);
+    }
+    .btn-outline:hover { border-color: var(--c-primary); color: var(--c-primary); }
+    .install-box {
+      background: var(--c-bg-soft);
+      border: 1px solid var(--c-border);
+      border-radius: 8px;
+      padding: 0.75rem 1.5rem;
+      display: inline-block;
+      font-size: 0.9rem;
+    }
+    .install-box code { color: var(--c-green); }
+
+    .features {
+      padding: 3rem 1.5rem;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1rem;
+    }
+    .feature-card {
+      background: var(--c-bg-card);
+      border: 1px solid var(--c-border);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+    }
+    .feature-card h3 { font-size: 1rem; margin-bottom: 0.25rem; }
+    .feature-card p { font-size: 0.85rem; color: var(--c-text-muted); }
+
+    .section {
+      padding: 3rem 1.5rem;
+    }
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    .section h2 {
+      font-size: 1.5rem;
+      margin-bottom: 1.5rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid var(--c-border);
+    }
+    .code-block {
+      background: var(--c-bg-soft);
+      border: 1px solid var(--c-border);
+      border-radius: var(--radius);
+      padding: 1.25rem 1.5rem;
+      overflow-x: auto;
+      font-size: 0.85rem;
+      line-height: 1.7;
+    }
+    .code-sm { font-size: 0.8rem; padding: 1rem 1.25rem; }
+
+    .type-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 1rem;
+    }
+    .type-card {
+      background: var(--c-bg-card);
+      border: 1px solid var(--c-border);
+      border-radius: var(--radius);
+      padding: 1.25rem;
+    }
+    .type-card h3 {
+      font-size: 0.95rem;
+      color: var(--c-accent);
+      margin-bottom: 0.75rem;
+    }
+    .type-card pre {
+      background: var(--c-bg);
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      font-size: 0.8rem;
+      line-height: 1.6;
+    }
+
+    .api-card {
+      background: var(--c-bg-card);
+      border: 1px solid var(--c-border);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+      margin-bottom: 1.25rem;
+    }
+    .api-header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-bottom: 0.5rem;
+    }
+    .api-header h3 { font-size: 1rem; }
+    .api-header h3 code { color: var(--c-primary); }
+    .api-returns {
+      font-size: 0.8rem;
+      color: var(--c-text-muted);
+    }
+    .api-returns code { color: var(--c-accent); }
+    .api-desc {
+      color: var(--c-text-muted);
+      font-size: 0.9rem;
+      margin-bottom: 1rem;
+    }
+    .api-table {
+      width: 100%;
+      font-size: 0.8rem;
+      border-collapse: collapse;
+      margin-bottom: 1rem;
+    }
+    .api-table th {
+      text-align: left;
+      padding: 0.4rem 0.75rem;
+      color: var(--c-text-muted);
+      border-bottom: 1px solid var(--c-border);
+    }
+    .api-table td {
+      padding: 0.4rem 0.75rem;
+      border-bottom: 1px solid rgba(51, 65, 85, 0.4);
+    }
+    .api-table code { color: var(--c-orange); font-size: 0.8rem; }
+    .api-card > .code-block { margin-top: 0; }
+
+    @media (max-width: 640px) {
+      .hero h1 { font-size: 1.8rem; }
+      .hero-actions { flex-direction: column; align-items: center; }
+      .api-header { flex-direction: column; }
+    }
+  </style>
+</Base>

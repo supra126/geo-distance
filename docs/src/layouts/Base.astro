@@ -1,0 +1,113 @@
+---
+import pkg from '../../../package.json';
+
+interface Props {
+  title: string;
+  description?: string;
+}
+
+const { title, description = pkg.description } = Astro.props;
+const base = import.meta.env.BASE_URL;
+const repoUrl = pkg.repository.url.replace(/^git\+/, '').replace(/\.git$/, '');
+const npmUrl = `https://www.npmjs.com/package/${pkg.name}`;
+---
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content={description} />
+  <title>{title}</title>
+  <link rel="icon" type="image/svg+xml" href={`${base}favicon.svg`} />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style is:global>
+    :root {
+      --c-bg: #0f172a;
+      --c-bg-soft: #1e293b;
+      --c-bg-card: #1e293b;
+      --c-border: #334155;
+      --c-text: #e2e8f0;
+      --c-text-muted: #94a3b8;
+      --c-primary: #38bdf8;
+      --c-primary-soft: #0ea5e9;
+      --c-accent: #a78bfa;
+      --c-green: #4ade80;
+      --c-orange: #fb923c;
+      --radius: 12px;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      background: var(--c-bg);
+      color: var(--c-text);
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+    code, pre {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    a {
+      color: var(--c-primary);
+      text-decoration: none;
+    }
+    a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <nav class="nav">
+    <div class="nav-inner">
+      <a href={base} class="nav-logo">{pkg.name}</a>
+      <div class="nav-links">
+        <a href={`${base}#api`}>API</a>
+        <a href={`${base}playground/`}>Playground</a>
+        <a href={repoUrl} target="_blank" rel="noopener">GitHub</a>
+        <a href={npmUrl} target="_blank" rel="noopener">npm</a>
+      </div>
+    </div>
+  </nav>
+  <slot />
+  <footer class="footer">
+    <p>{pkg.license} License &middot; <a href={repoUrl}>{pkg.name}</a></p>
+  </footer>
+  <style>
+    .nav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--c-border);
+    }
+    .nav-inner {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 0.75rem 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .nav-logo {
+      font-weight: 700;
+      font-size: 1rem;
+      color: var(--c-primary);
+    }
+    .nav-links {
+      display: flex;
+      gap: 1.5rem;
+      font-size: 0.9rem;
+    }
+    .nav-links a { color: var(--c-text-muted); }
+    .nav-links a:hover { color: var(--c-text); text-decoration: none; }
+    .footer {
+      text-align: center;
+      padding: 2rem 1rem;
+      color: var(--c-text-muted);
+      font-size: 0.85rem;
+      border-top: 1px solid var(--c-border);
+    }
+  </style>
+</body>
+</html>
